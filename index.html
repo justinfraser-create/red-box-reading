@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Red Box Reading Tracker</title>
+<meta name="description" content="See your Red Box reading progress: colour journey, card scores and progress over time.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Lexend:wght@400;500;600&display=swap">
+<style>
+/* Layout: one reader's "card box" — a code entry, then summary strip, colour journey shelves, score line, latest cards. Teachers get a class table. */
+:root{
+  --bg:#F3F5F7; --surface:#FFFFFF; --ink:#1B2430; --muted:#5D6977; --line:#DCE2E8;
+  --accent:#B7252C; --accent-ink:#FFFFFF; --accent-soft:#F8E3E3;
+  --good:#1F7A4D; --warn:#A86200;
+  --display:"Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body:"Lexend", "Segoe UI", system-ui, sans-serif;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12161C; --surface:#1B212A; --ink:#E9EDF2; --muted:#9AA6B3; --line:#2C3541;
+  --accent:#E25A5F; --accent-ink:#1A0B0C; --accent-soft:#3A1D20; --good:#5CC891; --warn:#E3A44A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161C; --surface:#1B212A; --ink:#E9EDF2; --muted:#9AA6B3; --line:#2C3541;
+  --accent:#E25A5F; --accent-ink:#1A0B0C; --accent-soft:#3A1D20; --good:#5CC891; --warn:#E3A44A; color-scheme:dark}
+*,*::before,*::after{box-sizing:border-box}
+html{color-scheme:light}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
+.wrap{max-width:980px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:22px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-size:1.3rem}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* top bar */
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.box{width:40px;height:40px;border-radius:9px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);font-family:var(--display);font-weight:800;font-size:1.1rem;box-shadow:inset 0 -6px 0 rgba(0,0,0,.18)}
+.brand h1{font-size:1.35rem;line-height:1.1}
+.brand p{margin:0;font-size:.85rem}
+.tabs{display:flex;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px}
+.tabs button{border:0;background:transparent;padding:6px 14px;border-radius:999px;font-size:.9rem}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px}
+
+/* code entry */
+.entry{display:grid;gap:18px;justify-items:center;text-align:center;padding:40px 20px}
+.entry h2{font-size:clamp(1.6rem,4vw,2.3rem)}
+.entry form{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.entry input{width:7.5ch;font-family:var(--display);font-weight:800;font-size:2.2rem;text-align:center;border:2px solid var(--line);border-radius:12px;padding:6px 10px;background:var(--bg)}
+.btn{border:0;border-radius:12px;padding:12px 22px;background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:1rem}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.err{color:var(--accent);min-height:1.5em;margin:0;font-weight:500}
+
+/* reader header */
+.reader-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.reader-head .who{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.reader-head .code{font-family:var(--display);font-weight:800;font-size:clamp(2.4rem,7vw,3.4rem);line-height:1}
+.now{display:inline-flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 14px 6px 8px;font-weight:500}
+.dot{width:22px;height:22px;border-radius:50%;flex:none;border:2px solid rgba(0,0,0,.12)}
+
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.stat b{font-family:var(--display);font-size:2rem;line-height:1.1;font-weight:800}
+.stat span{font-size:.82rem;color:var(--muted)}
+.stat small{font-size:.8rem;font-weight:500}
+.up{color:var(--good)} .down{color:var(--warn)}
+
+/* journey */
+.journey{display:flex;flex-direction:column;gap:14px}
+.shelf{display:grid;grid-template-columns:150px minmax(0,1fr);gap:14px;align-items:center}
+.shelf-label{display:flex;align-items:center;gap:10px;min-width:0}
+.shelf-label strong{font-family:var(--display);font-size:1.05rem}
+.shelf-label div{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+.shelf-label small{color:var(--muted);font-size:.78rem}
+.cards{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:6px}
+.card{aspect-ratio:3/4;max-width:100%;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.72rem;line-height:1.1;position:relative;min-width:0}
+.card .n{font-family:var(--display);font-weight:800;font-size:1rem}
+.card.todo{border:1.5px dashed var(--line);color:var(--muted)}
+.card.done{color:var(--cink,#1B2430);box-shadow:inset 0 -4px 0 rgba(0,0,0,.14)}
+.card.perfect::after{content:"★";position:absolute;top:2px;right:4px;font-size:.7rem}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);margin-top:4px}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.legend i{display:inline-block;width:12px;height:16px;border-radius:3px}
+
+/* chart */
+.chart-wrap{overflow-x:auto}
+svg text{fill:var(--muted);font-family:var(--body);font-size:11px}
+.sect-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+
+/* recent */
+.recent{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.recent li{display:grid;grid-template-columns:22px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.recent li:first-child{border-top:0}
+.bar{width:90px;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ink)}
+
+.two{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:22px}
+
+/* class table */
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:.92rem}
+th{text-align:left;font-weight:500;color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--bg)}
+.sort{display:flex;align-items:center;gap:4px;font-size:.85rem}
+.sort span{margin-right:4px}
+.sort button{border:1px solid var(--line);background:var(--surface);padding:5px 12px;border-radius:999px;font-size:.85rem}
+.sort button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.pill{display:inline-flex;align-items:center;gap:8px}
+.pill .dot{width:14px;height:14px}
+
+.update{display:grid;gap:12px}
+.update textarea{width:100%;min-height:110px;border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:10px;font-size:.85rem;font-family:ui-monospace,Menlo,Consolas,monospace}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.note{font-size:.85rem;color:var(--muted);margin:0}
+.footer{font-size:.8rem;color:var(--muted);text-align:center;margin:0}
+.status{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+.linkbtn{border:0;background:none;color:var(--accent);text-decoration:underline;font-size:.8rem;padding:0}
+
+@media (max-width:760px){
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .two{grid-template-columns:minmax(0,1fr)}
+  .shelf{grid-template-columns:minmax(0,1fr);gap:8px}
+  .cards{gap:4px}
+  .card{font-size:.6rem}
+  .card .n{font-size:.85rem}
+}
+@media (prefers-reduced-motion:no-preference){
+  .card.done{animation:pop .35s ease-out both}
+  @keyframes pop{from{transform:scale(.85)}to{transform:none}}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="box" aria-hidden="true">R</div>
+      <div><h1>Red Box Reading</h1><p class="muted">My reading progress</p></div>
+    </div>
+    <nav class="tabs" id="tabs" hidden>
+      <button type="button" id="tab-reader" aria-pressed="true">Reader</button>
+      <button type="button" id="tab-class" aria-pressed="false">Class</button>
+    </nav>
+  </header>
+
+  <main id="view"></main>
+
+  <div class="status"><p class="footer" id="footer">Loading results…</p><button type="button" class="linkbtn" id="refresh">Refresh</button></div>
+</div>
+
+<script>
+(() => {
+  // ---------- colour swatches for the kit's card colours ----------
+  const SWATCH = {
+    Coral:"#F28B7D", Red:"#D9473F", Tan:"#CFA77B", Yellow:"#F4CF45", Amber:"#EDA43A",
+    Orange:"#EF8636", Sunset:"#E8674A", Sky:"#86C8EA", Ocean:"#2E7DB8", Mist:"#AFC2CE",
+    Lime:"#A4CF4B", Turquoise:"#36BDAE", Mauve:"#B78DBD", Green:"#4FA65B", Blue:"#3F6FCF",
+    Purple:"#7A55B5", Brown:"#93684A", Gold:"#D7A92B", Aqua:"#5CCFD6", Olive:"#8A9440", Rose:"#E58BA8", Violet:"#9A6CD0"
+  };
+  const DARK_TEXT = new Set(["Coral","Tan","Yellow","Amber","Orange","Sky","Mist","Lime","Turquoise","Mauve","Gold","Aqua","Rose"]);
+  const SPELLING = {turquiose:"Turquoise", turqoise:"Turquoise", turquois:"Turquoise", grey:"Mist"};
+  const swatch = c => SWATCH[c] || hashColour(c);
+  const inkOn = c => (SWATCH[c] && !DARK_TEXT.has(c)) ? "#FFFFFF" : "#1B2430";
+  function hashColour(s){let h=0;for(const ch of s)h=(h*31+ch.charCodeAt(0))%360;return `hsl(${h} 55% 60%)`}
+  function normColour(raw){
+    const t=String(raw||"").trim(); if(!t) return "";
+    const low=t.toLowerCase(); if(SPELLING[low]) return SPELLING[low];
+    return t.charAt(0).toUpperCase()+t.slice(1).toLowerCase();
+  }
+
+  // ---------- CSV parsing ----------
+  function parseCSV(text){
+    const rows=[];let row=[],f="",q=false;
+    for(let i=0;i<text.length;i++){
+      const c=text[i];
+      if(q){ if(c==='"'){ if(text[i+1]==='"'){f+='"';i++} else q=false } else f+=c }
+      else if(c==='"') q=true;
+      else if(c===','){row.push(f);f=""}
+      else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n')i++; row.push(f);rows.push(row);row=[];f="" }
+      else f+=c;
+    }
+    if(f!==""||row.length){row.push(f);rows.push(row)}
+    return rows.filter(r=>r.some(v=>v.trim()!==""));
+  }
+  function parseDate(s){
+    const m=String(s).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    if(!m) { const d=new Date(s); return isNaN(d)?null:d }
+    return new Date(+m[3],+m[2]-1,+m[1],+(m[4]||0),+(m[5]||0),+(m[6]||0));
+  }
+  // Turns the sheet into clean attempts. Rows with impossible marks are skipped and counted.
+  function toAttempts(text){
+    const rows=parseCSV(text); if(!rows.length) return {attempts:[],skipped:0,error:"The file is empty."};
+    const head=rows[0].map(h=>h.trim().toLowerCase());
+    const col=k=>head.findIndex(h=>h.includes(k));
+    const ix={t:col("timestamp"),code:col("entry"),score:col("my score"),total:col("total"),colour:head.findIndex(h=>h.startsWith("colo")),card:col("card")};
+    const missing=Object.entries(ix).filter(([,v])=>v<0).map(([k])=>k);
+    if(missing.length) return {attempts:[],skipped:0,error:"Some columns are missing. The first row needs: Timestamp, Entry Code, My Score, Total Possible, Colour, Card Number."};
+    const out=[];let skipped=0;
+    for(const r of rows.slice(1)){
+      const date=parseDate(r[ix.t]); const code=String(r[ix.code]||"").trim();
+      const score=Number(r[ix.score]); const total=Number(r[ix.total]);
+      const colour=normColour(r[ix.colour]); const card=parseInt(r[ix.card],10);
+      if(!date||!code||!colour||!Number.isFinite(score)||!Number.isFinite(total)||total<=0||score<0||score>total||!(card>0)){skipped++;continue}
+      out.push({date,code,score,total,pct:score/total,colour,card});
+    }
+    out.sort((a,b)=>a.date-b.date);
+    return {attempts:out,skipped};
+  }
+
+  // ---------- per-reader summary ----------
+  const avg=a=>a.length?a.reduce((s,x)=>s+x.pct,0)/a.length:0;
+  function summarise(code,all){
+    const list=all.filter(a=>a.code===code);
+    const colours=[];const byColour=new Map();
+    for(const a of list){
+      if(!byColour.has(a.colour)){byColour.set(a.colour,new Map());colours.push(a.colour)}
+      const cards=byColour.get(a.colour);const prev=cards.get(a.card);
+      cards.set(a.card,{best:prev?Math.max(prev.best,a.pct):a.pct,bestA:prev&&prev.best>=a.pct?prev.bestA:a,tries:(prev?prev.tries:0)+1,last:a.date});
+    }
+    const distinct=[...byColour.values()].reduce((s,m)=>s+m.size,0);
+    const perfect=list.filter(a=>a.score===a.total).length;
+    const first5=list.slice(0,5),last5=list.slice(-5);
+    return {code,list,colours,byColour,distinct,perfect,avg:avg(list),first5:avg(first5),last5:avg(last5),latest:list[list.length-1]};
+  }
+
+  // ---------- state ----------
+  // ---------- settings ----------
+  // The Google Sheet that the Red Box form fills. It must stay shared as "Anyone with the link can view".
+  const SHEET_ID="1cMmjFxS30RI0-vG4M2yPq4oK0GEEZKscbySqK37Kuj4";
+  const REFRESH_SECONDS=15;
+  const CSV_URL=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&headers=1`;
+
+  let data={attempts:[],skipped:0};
+  let loadedAt=null, loadError="", loading=true;
+  let current=null, mode="reader";
+  let classSort="active"; // "active" = most recent first, "code" = entry code order
+  const teacher=location.hash==="#teacher";
+  const view=document.getElementById("view");
+  const fmtDate=d=>d.toLocaleDateString("en-AU",{day:"numeric",month:"short"});
+  const fmtLong=d=>d.toLocaleDateString("en-AU",{weekday:"short",day:"numeric",month:"short",year:"numeric"});
+  const pct=x=>Math.round(x*100)+"%";
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+
+  function footer(){
+    const el=document.getElementById("footer");
+    if(loading&&!loadedAt){el.textContent="Loading results…";return}
+    const last=data.attempts.length?data.attempts[data.attempts.length-1].date:null;
+    const parts=[];
+    if(last) parts.push(`Results up to ${fmtLong(last)}`);
+    if(loadedAt) parts.push(`checked ${loadedAt.toLocaleTimeString("en-AU",{hour:"numeric",minute:"2-digit"})}`);
+    if(loadError) parts.push(loadError);
+    el.textContent=parts.join(" · ");
+  }
+
+  // ---------- views ----------
+  function render(){
+    document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-pressed",String(b.id==="tab-"+mode)));
+    if(mode==="class") return renderClass();
+    if(current && data.attempts.some(a=>a.code===current)) return renderReader(current);
+    renderEntry();
+  }
+
+  function renderEntry(msg=""){
+    if(!data.attempts.length){
+      view.innerHTML=`<section class="panel entry"><h2>${loading?"Loading results…":"Results can't be loaded right now"}</h2>
+        <p class="muted" style="margin:0">${loading?"This only takes a moment.":"Check your internet connection, then select Refresh at the bottom of the page."}</p></section>`;
+      return;
+    }
+    view.innerHTML=`
+      <section class="panel entry">
+        <h2>What's your entry code?</h2>
+        <p class="muted" style="margin:0">Type the code you use on the Red Box form to see all your cards.</p>
+        <form id="code-form" autocomplete="off">
+          <label for="code-input" class="muted" style="position:absolute;left:-9999px">Entry code</label>
+          <input id="code-input" inputmode="numeric" maxlength="6" placeholder="00" aria-describedby="code-err">
+          <button class="btn" type="submit">Show my progress</button>
+        </form>
+        <p class="err" id="code-err" role="status">${esc(msg)}</p>
+      </section>`;
+    const f=document.getElementById("code-form"),inp=document.getElementById("code-input");
+    f.addEventListener("submit",e=>{
+      e.preventDefault();const c=inp.value.trim();
+      if(!c){document.getElementById("code-err").textContent="Type your code first.";return}
+      if(!data.attempts.some(a=>a.code===c)){document.getElementById("code-err").textContent=`No cards found for code ${c} yet. Check the number and try again.`;return}
+      current=c;store.set("rbr-code",c);render();
+    });
+    inp.focus({preventScroll:true});
+  }
+
+  function renderReader(code){
+    const s=summarise(code,data.attempts);
+    const diff=s.list.length>=6?Math.round((s.last5-s.first5)*100):null;
+    const trend=diff===null?"":diff>0?`<small class="up">Up ${diff} points since your first 5</small>`:diff<0?`<small class="down">Down ${-diff} points since your first 5</small>`:`<small class="muted">Steady since your first 5</small>`;
+    const L=s.latest;
+    view.innerHTML=`
+      <section class="reader-head">
+        <div class="who"><span class="muted">Reader</span><span class="code num">${esc(code)}</span></div>
+        <div class="row">
+          <span class="now"><span class="dot" style="background:${swatch(L.colour)}"></span>Last card: ${esc(L.colour)} ${L.card}</span>
+          <button class="btn ghost" type="button" id="switch">Change reader</button>
+        </div>
+      </section>
+
+      <section class="stats" aria-label="Summary">
+        <div class="stat"><b class="num">${s.distinct}</b><span>different cards read</span></div>
+        <div class="stat"><b class="num">${pct(s.avg)}</b><span>average score</span></div>
+        <div class="stat"><b class="num">${pct(s.last5)}</b><span>average of last 5 cards</span>${trend}</div>
+        <div class="stat"><b class="num">${s.perfect}</b><span>perfect scores ★</span></div>
+      </section>
+
+      <section class="panel">
+        <div class="sect-head"><h2>My colour journey</h2><span class="muted" style="font-size:.85rem">Colours in the order you started them</span></div>
+        <div class="journey">${s.colours.map(c=>shelf(c,s.byColour.get(c))).join("")}</div>
+        <div class="legend"><span><i style="background:var(--muted)"></i>Card read (best score shown)</span><span><i style="border:1.5px dashed var(--muted)"></i>Not read yet</span><span>★ Perfect score</span></div>
+      </section>
+
+      <section class="two">
+        <div class="panel">
+          <div class="sect-head"><h2>My scores over time</h2><span class="muted" style="font-size:.85rem">${s.list.length} card${s.list.length===1?"":"s"} submitted</span></div>
+          <div class="chart-wrap">${lineChart(s.list)}</div>
+        </div>
+        <div class="panel">
+          <div class="sect-head"><h2>Latest cards</h2></div>
+          <ul class="recent">${s.list.slice(-6).reverse().map(a=>`
+            <li><span class="dot" style="background:${swatch(a.colour)}"></span>
+              <span><strong>${esc(a.colour)} ${a.card}</strong><br><span class="muted" style="font-size:.8rem">${fmtDate(a.date)}</span></span>
+              <span class="bar" aria-hidden="true"><i style="width:${a.pct*100}%"></i></span>
+              <span class="num" style="font-weight:600">${a.score}/${a.total}</span></li>`).join("")}
+          </ul>
+        </div>
+      </section>`;
+    document.getElementById("switch").addEventListener("click",()=>{current=null;store.del("rbr-code");mode="reader";render()});
+  }
+
+  function shelf(colour,cards){
+    const max=Math.max(10,...cards.keys());
+    const slots=Array.from({length:max},(_,i)=>i+1);
+    const bg=swatch(colour),ink=inkOn(colour);
+    const tiles=slots.map(n=>{
+      const c=cards.get(n);
+      if(!c) return `<div class="card todo" title="${esc(colour)} ${n}: not read yet"><span class="n">${n}</span></div>`;
+      const sc=c.bestA;const perf=sc.score===sc.total;
+      return `<div class="card done${perf?" perfect":""}" style="background:${bg};--cink:${ink}" title="${esc(colour)} ${n}: best ${sc.score}/${sc.total}${c.tries>1?` (${c.tries} tries)`:""}"><span class="n">${n}</span><span class="num">${sc.score}/${sc.total}</span></div>`;
+    }).join("");
+    const cols=max>10?`style="grid-template-columns:repeat(${Math.min(max,15)},minmax(0,1fr))"`:"";
+    return `<div class="shelf"><div class="shelf-label"><span class="dot" style="background:${bg}"></span><div><strong>${esc(colour)}</strong><small>${cards.size} of ${max} cards</small></div></div><div class="cards" ${cols}>${tiles}</div></div>`;
+  }
+
+  function lineChart(list){
+    const W=560,H=230,P={l:38,r:14,t:14,b:30};
+    const iw=W-P.l-P.r,ih=H-P.t-P.b;
+    const n=list.length;
+    const x=i=>P.l+(n<=1?iw/2:i*iw/(n-1));
+    const y=v=>P.t+(1-v)*ih;
+    const grid=[0,.25,.5,.75,1].map(v=>`<line x1="${P.l}" x2="${W-P.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${P.l-8}" y="${y(v)+4}" text-anchor="end">${v*100}%</text>`).join("");
+    // rolling average of last 3 shows the direction without jumping around
+    const roll=list.map((_,i)=>avg(list.slice(Math.max(0,i-2),i+1)));
+    const path=roll.map((v,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+    const area=n>1?`<path d="${path} L${x(n-1)},${y(0)} L${x(0)},${y(0)} Z" fill="var(--accent)" opacity=".08"/>`:"";
+    // date labels at the first card of each session day
+    let lastDay="";const labels=[];
+    list.forEach((a,i)=>{const d=a.date.toDateString();if(d!==lastDay){lastDay=d;labels.push(i)}});
+    const minGap=n>1?54/(iw/(n-1)):1;let prevI=-99;
+    const xl=labels.filter(i=>{if(i-prevI>=minGap){prevI=i;return true}return false}).map(i=>`<text x="${x(i)}" y="${H-8}" text-anchor="middle">${fmtDate(list[i].date)}</text>`).join("");
+    const dots=list.map((a,i)=>`<circle cx="${x(i)}" cy="${y(a.pct)}" r="${i===n-1?6:4.5}" fill="${swatch(a.colour)}" stroke="var(--surface)" stroke-width="1.5"><title>${esc(a.colour)} ${a.card}: ${a.score}/${a.total} on ${fmtDate(a.date)}</title></circle>`).join("");
+    return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Score for each card over time">${grid}${area}<path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>${dots}${xl}</svg>
+      <p class="note" style="margin-top:6px">Dots are each card, in its colour. The red line is your average of the last 3 cards.</p>`;
+  }
+
+  function renderClass(){
+    const codes=[...new Set(data.attempts.map(a=>a.code))];
+    const byCode=(a,b)=>{const x=+a.code,y=+b.code;return (Number.isFinite(x)&&Number.isFinite(y))?x-y:a.code.localeCompare(b.code,"en-AU",{numeric:true})};
+    const rows=codes.map(c=>summarise(c,data.attempts)).sort(classSort==="code"?byCode:(a,b)=>b.latest.date-a.latest.date||byCode(a,b));
+    view.innerHTML=`
+      <section class="panel">
+        <div class="sect-head"><h2>Class overview</h2>
+          <div class="sort" role="group" aria-label="Order by"><span class="muted">Order by</span>
+            <button type="button" id="sort-active" aria-pressed="${classSort==="active"}">Last active</button>
+            <button type="button" id="sort-code" aria-pressed="${classSort==="code"}">Code</button>
+          </div>
+        </div>
+        <p class="muted" style="font-size:.85rem;margin:-4px 0 12px">${rows.length} entry codes · ${data.attempts.length} cards${data.skipped?` · ${data.skipped} row${data.skipped===1?"":"s"} skipped (impossible marks)`:""}</p>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Code</th><th>Last card</th><th class="num">Cards read</th><th class="num">Average</th><th class="num">Last 5</th><th>Last active</th><th>Recent scores</th></tr></thead>
+          <tbody>${rows.map(s=>`<tr data-code="${esc(s.code)}" tabindex="0">
+            <td class="num"><strong>${esc(s.code)}</strong></td>
+            <td><span class="pill"><span class="dot" style="background:${swatch(s.latest.colour)}"></span>${esc(s.latest.colour)} ${s.latest.card}</span></td>
+            <td class="num">${s.distinct}</td><td class="num">${pct(s.avg)}</td>
+            <td class="num ${s.last5<.7?"down":""}">${pct(s.last5)}</td>
+            <td>${fmtDate(s.latest.date)}</td><td>${spark(s.list.slice(-10))}</td></tr>`).join("")}
+          </tbody></table></div>
+        <p class="note" style="margin-top:10px">Select a row to open that reader. Last-5 averages under 70% are highlighted.</p>
+      </section>`;
+    [["sort-active","active"],["sort-code","code"]].forEach(([id,v])=>document.getElementById(id).addEventListener("click",()=>{classSort=v;store.set("rbr-sort",v);renderClass()}));
+    view.querySelectorAll("tbody tr").forEach(tr=>{
+      const open=()=>{current=tr.dataset.code;mode="reader";render();window.scrollTo(0,0)};
+      tr.addEventListener("click",open);tr.addEventListener("keydown",e=>{if(e.key==="Enter")open()});
+    });
+  }
+  function spark(list){
+    const W=110,H=28,n=list.length;const x=i=>n<=1?W/2:3+i*(W-6)/(n-1),y=v=>3+(1-v)*(H-6);
+    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true"><path d="${list.map((a,i)=>`${i?"L":"M"}${x(i)},${y(a.pct)}`).join("")}" fill="none" stroke="var(--muted)" stroke-width="1.5"/>${n?`<circle cx="${x(n-1)}" cy="${y(list[n-1].pct)}" r="3" fill="var(--accent)"/>`:""}</svg>`;
+  }
+
+  // ---------- loading the sheet ----------
+  // Reads the sheet as CSV. If the browser blocks that, falls back to Google's JSONP feed.
+  function loadJsonp(){
+    return new Promise((resolve,reject)=>{
+      const cb="rbr_cb_"+Date.now();const s=document.createElement("script");
+      const timer=setTimeout(()=>{cleanup();reject(new Error("timeout"))},15000);
+      function cleanup(){clearTimeout(timer);delete window[cb];s.remove()}
+      window[cb]=resp=>{
+        cleanup();
+        try{
+          if(resp.status==="error") throw new Error("sheet error");
+          const cols=resp.table.cols.map(c=>c.label||"");
+          const q=v=>{v=v==null?"":String(v);return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v};
+          const lines=[cols.map(q).join(",")].concat(resp.table.rows.map(r=>(r.c||[]).map(c=>q(c?(c.f!=null?c.f:c.v):"")).join(",")));
+          resolve(lines.join("\n"));
+        }catch(e){reject(e)}
+      };
+      s.src=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?headers=1&tqx=responseHandler:${cb}`;
+      s.onerror=()=>{cleanup();reject(new Error("network"))};
+      document.head.appendChild(s);
+    });
+  }
+  let inFlight=false;
+  async function loadSheet(){
+    if(inFlight) return; // skip a check if the last one is still running
+    inFlight=true;
+    try{ await fetchSheet() } finally { inFlight=false }
+  }
+  async function fetchSheet(){
+    loading=true;footer();
+    let text=null;
+    try{
+      const r=await fetch(CSV_URL+"&t="+Date.now(),{cache:"no-store"});
+      if(!r.ok) throw new Error("http "+r.status);
+      text=await r.text();
+      if(/^\s*<!doctype|<html/i.test(text)) throw new Error("not csv");
+    }catch(e){
+      try{text=await loadJsonp()}catch(e2){text=null}
+    }
+    loading=false;
+    if(text){
+      const parsed=toAttempts(text);
+      if(!parsed.error&&parsed.attempts.length){
+        const changed=parsed.attempts.length!==data.attempts.length;
+        data=parsed;loadedAt=new Date();loadError="";
+        store.set("rbr-cache",text);
+        footer();
+        // don't wipe a code a student is halfway through typing
+        const typing=document.getElementById("code-input");
+        if(changed&&!(typing&&typing.value)) render();
+        return;
+      }
+      loadError="the sheet's columns have changed";
+    }else{
+      loadError=data.attempts.length?"couldn't refresh, showing earlier results":"";
+    }
+    footer();
+    // only redraw on failure when there is nothing on screen yet
+    if(!data.attempts.length) render();
+  }
+
+  // ---------- boot ----------
+  if(teacher) document.getElementById("tabs").hidden=false;
+  document.getElementById("tab-reader").addEventListener("click",()=>{mode="reader";render()});
+  document.getElementById("tab-class").addEventListener("click",()=>{mode="class";render()});
+  document.getElementById("refresh").addEventListener("click",()=>loadSheet());
+  current=store.get("rbr-code");
+  if(store.get("rbr-sort")==="code") classSort="code";
+  const cached=store.get("rbr-cache");
+  if(cached){const p=toAttempts(cached);if(!p.error&&p.attempts.length)data=p}
+  render();footer();
+  loadSheet();
+  setInterval(()=>{if(document.visibilityState==="visible")loadSheet()},REFRESH_SECONDS*1000);
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")loadSheet()});
+})();
+</script>
+</body>
+</html>
